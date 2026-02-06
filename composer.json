@@ -11,7 +11,7 @@
     ],
     "require": {
         "php": ">=8.2",
-        "psr/container": "^2.0",
+        "juzdy/container": "^1",
         "psr/simple-cache": "^3.0",
         "psr/event-dispatcher": "^1.0",
         "psr/http-server-middleware": "^1.0",
