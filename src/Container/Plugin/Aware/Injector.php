@@ -6,6 +6,7 @@ use Juzdy\Container\Contract\InjectableInterface;
 use Juzdy\Container\Exception\RuntimeException;
 use Juzdy\Container\Plugin\PluginInterface;
 use ReflectionMethod;
+use Throwable;
 
 /**
  * Dependency injector plugin
@@ -46,7 +47,7 @@ class Injector implements PluginInterface
                     }
                     try {
                         $context->getContainer()->get($injection);
-                    } catch (\Psr\Container\NotFoundExceptionInterface $ex) {
+                    } catch (Throwable $ex) {
                         throw new RuntimeException(
                             sprintf(
                                 'Cannot inject parameter %s in method %s of class %s: service %s not found in container',

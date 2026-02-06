@@ -1,15 +1,9 @@
 <?php
 namespace Juzdy\Container\Plugin\Factory;
 
-use Juzdy\Container\Contract\LazyGhostInterface;
+use Juzdy\Container\Contract\Factory\LazyGhostInterface;
 use Juzdy\Container\Plugin\PluginInterface;
 
-/**
- * Lazy ghost factory plugin
- * Instantiates classes implementing LazyGhostInterface as lazy ghost proxies
- *
- * @package Juzdy\Container
- */
 class LazyGhostFactory implements PluginInterface
 {
 
@@ -23,9 +17,11 @@ class LazyGhostFactory implements PluginInterface
     {
         $reflection = $context->reflection();
 
+        $constructor = $reflection->getConstructor();
+
         $hasAccessableConstructor =
-            $reflection->getConstructor() &&
-            $reflection->getConstructor()->isPublic();
+            $constructor &&
+            $constructor->isPublic();
 
         if (
             is_a($context->class(), LazyGhostInterface::class, true)

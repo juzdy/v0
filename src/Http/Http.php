@@ -16,11 +16,11 @@ use Juzdy\EventBus\Event\EventInterface;
 use Juzdy\EventBus\EventDispatcher;
 use Juzdy\Http\Event\BeforeRun;
 use Juzdy\Http\Exception\NotFoundException;
+use Juzdy\Http\Handler\NotFoundHandler;
 use Juzdy\Http\HandlerInterface;
 use Juzdy\Http\RequestInterface;
 use Juzdy\Http\ResponseInterface;
 use Juzdy\Http\Middleware\MiddlewarePipeline;
-use Juzdy\Http\Middleware\MiddlewareInterface;
 
 /**
  * HTTP Application implementation
@@ -30,16 +30,14 @@ use Juzdy\Http\Middleware\MiddlewareInterface;
 class Http implements AppInterface, InjectableInterface, PrototypeInterface, SharedInterface
 {
     /**
-     * @var RequestInterface|null
-     */
-    //protected ?RequestInterface $request = null;
-
-    /**
-     * @param ContainerInterface $container Dependency injection container
-     * @param MiddlewarePipeline $pipeline Middleware pipeline
-     * @param Router|null $router Router instance
-     */
-    
+     * Constructor
+     * 
+     * @param ContainerInterface $container
+     * @param RequestInterface $request
+     * @param EventDispatcherInterface $eventDispatcher
+     * @param MiddlewarePipeline $pipeline
+     * @param EventInterface $beforeRunEvent
+     */    
     public function __construct(
         //private NothingInterface $nothing,
         private ContainerInterface $container,
@@ -54,18 +52,6 @@ class Http implements AppInterface, InjectableInterface, PrototypeInterface, Sha
     public function __clone(): void
     {
         // Custom clone logic if needed
-    }
-
-    /**
-     * Add middleware to the application pipeline.
-     *
-     * @param MiddlewareInterface $middleware
-     * @return self
-     */
-    public function addMiddleware(MiddlewareInterface $middleware): self
-    {
-        $this->getPipeline()->pipe($middleware);
-        return $this;
     }
     
 
@@ -103,13 +89,7 @@ class Http implements AppInterface, InjectableInterface, PrototypeInterface, Sha
     {
         // 
         $this->getPipeline()->setFallbackHandler(
-            //$this->getRouter()
-            new class () implements HandlerInterface {
-                public function handle(RequestInterface $request): ResponseInterface
-                {
-                    throw new NotFoundException("last handler reached, Response not generated.");
-                }
-            }
+            $this->getContainer()->get(NotFoundHandler::class)
         );
         
         // Process the request through the middleware pipeline
@@ -127,7 +107,6 @@ class Http implements AppInterface, InjectableInterface, PrototypeInterface, Sha
     }
 
     /**
-     @todo: to be removed and use as dependency only in constructor
      * Get the current HTTP request.
      *
      * @return RequestInterface

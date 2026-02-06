@@ -1,6 +1,8 @@
 <?php
 namespace Juzdy\Http;
 
+use Juzdy\Http\Middleware\MiddlewareInterface;
+
 /**
  * PSR-15-inspired Request Handler Interface
  * 
@@ -18,5 +20,4 @@ interface HandlerInterface
      * @return ResponseInterface The generated response
      */
     public function handle(RequestInterface $request): ResponseInterface;
-
 }

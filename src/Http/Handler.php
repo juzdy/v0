@@ -25,8 +25,7 @@ abstract class Handler implements HandlerInterface, MiddlewareAwareInterface
      */
     public static function route(): string
     {
-        return strtolower(preg_replace('/.*?Handler$/', '', str_replace('\\', '/', static::class)));
-        //return Router::route(static::class);
+        return Router::route(static::class);
     }
 
     /**
@@ -44,7 +43,6 @@ abstract class Handler implements HandlerInterface, MiddlewareAwareInterface
     {
         return $this->response ??= new Response();
     }
-
     
     /**
      * Redirect to a given URL

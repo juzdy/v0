@@ -1,14 +1,13 @@
 <?php
 
-namespace Juzdy\Container\Plugin\Resolver;
+namespace Juzdy\Container\Plugin\Di;
 
 use ReflectionParameter;
 use Juzdy\Container\Context\ContextInterface;
 use Juzdy\Container\Exception\RuntimeException;
-use Juzdy\Container\Plugin\PluginInterface;
 use Psr\Container\NotFoundExceptionInterface;
 
-class TypeResolver extends AbstractResolverPlugin implements PluginInterface
+class UseType extends AbstractDi
 {
 
     public function __invoke(mixed $target, callable $next): mixed
@@ -38,10 +37,11 @@ class TypeResolver extends AbstractResolverPlugin implements PluginInterface
         }
 
         $typeName = $type->getName();
-        $preference = $typeName;
+        $id = $typeName;
 
         try {
-            $service = $context->getContainer()->get($preference);
+
+            $service = $context->container()->get($id);
             
             return $service;
         } catch (NotFoundExceptionInterface) {

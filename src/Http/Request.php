@@ -12,7 +12,7 @@ class Request implements RequestInterface
     /**
      * @var array
      */
-    private array $session = [];
+    private ?array $session = null;
     /**
      * @var array
      */
@@ -49,8 +49,8 @@ class Request implements RequestInterface
      */
     public function __construct()
     {
+        $this->session = null; //lazy load
         $this->params = &$_REQUEST;
-        $this->session = &$_SESSION;
         $this->cookies = &$_COOKIE;
         $this->server = &$_SERVER;
         $this->queryParams = &$_GET;
@@ -157,6 +157,10 @@ class Request implements RequestInterface
      */
     public function session(?string $key = null, mixed $value = null): mixed
     {
+        if ($this->session === null) {
+            $this->session = &$_SESSION; //lazy load
+        }
+
         if ($key === null) {
             return $this->session;
         }
