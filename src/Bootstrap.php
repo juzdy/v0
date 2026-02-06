@@ -6,6 +6,7 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Juzdy\Container\Attribute\Parameter\Using;
 use Juzdy\Container\Attribute\Preference;
 use Juzdy\Container\Attribute\PropagatePreference;
+use Juzdy\Container\Attribute\Shared;
 use Juzdy\EventBus\Event\EventInterface;
 use Psr\Container\ContainerInterface;
 
@@ -30,6 +31,7 @@ use Psr\Container\ContainerInterface;
 //         EventDispatcherInterface::class => \Juzdy\EventBus\EventDispatcher::class,
 //     ]
 // )]
+#[Shared]
 class Bootstrap implements BootstrapInterface
 {
 
@@ -67,7 +69,6 @@ class Bootstrap implements BootstrapInterface
      */
     public function boot(): void
     {
-
         $this->composerUp();
 
         $app = $this->getApp();
@@ -81,6 +82,23 @@ class Bootstrap implements BootstrapInterface
         $app->run();
     }
 
+    /**
+     * Discover and boot package-specific bootstraps
+     * 
+     * This method checks for the presence of a Bootstrap class in each PSR-4 namespace defined in composer.json.
+     * If such a class exists and implements BootstrapInterface, it is instantiated and its boot() method is called.
+     * This allows packages to automatically register their own bootstrapping logic without requiring manual integration.
+     * For example, if a package defines a namespace "Vendor\Package", the method will look for a class "Vendor\Package\Bootstrap" and attempt to boot it if it implements the required interface.
+     * Use this mechanism to allow packages to self-register their bootstrapping logic, such as event listeners, middleware, or other initialization code.
+     * Vendor\Bootstrap may be injected with dependencies via the container, allowing for flexible and decoupled package design.
+     * Use Constructor Injection in package bootstraps to access services from the container, such as the event dispatcher, configuration, or other shared services.
+     * 
+     * Discovery is controlled by the 'bootstrap.discover' configuration option. If set to false, discovery is skipped.
+     * The method uses the Composer class to retrieve the list of PSR-4 namespaces and attempts to find a corresponding Bootstrap class in each namespace.
+     * If a Bootstrap class is found and implements the required interface, it is resolved from the container and booted.
+     * Errors during discovery (e.g., class not found) are caught and ignored, allowing the process to continue with other namespaces.
+     * @return void
+     */
     protected function composerUp(): void
     {
         if (!Config::get('bootstrap.discover', false)) {
@@ -107,10 +125,7 @@ class Bootstrap implements BootstrapInterface
                 continue;
             }
         }
-            
-
     }
-
 
     protected function getEventDispatcher(): EventDispatcherInterface
     {
