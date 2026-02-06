@@ -6,9 +6,6 @@ use Juzdy\Http\RequestInterface;
 use Juzdy\Http\ResponseInterface;
 use Juzdy\Http\Middleware\MiddlewareInterface;
 
-
-use Psr\Container\ContainerInterface;
-
 /**
  * CORS Middleware
  * 

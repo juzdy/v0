@@ -32,9 +32,10 @@ trait MiddlewareTrait
      * @param MiddlewareInterface $middleware
      * @return self
      */
-    public function addMiddleware(MiddlewareInterface $middleware): static
+    public function addMiddleware(MiddlewareInterface ...$middleware): static
     {
-        $this->middleware[] = $middleware;
+        array_push($this->middleware, ...$middleware);
+        
         return $this;
     }
 
@@ -51,17 +52,6 @@ trait MiddlewareTrait
         }
         return $this;
     }
-
-    /**
-     * Get the middleware registered for this controller.
-     *
-     * @return MiddlewareInterface[]
-     */
-    public function getMiddleware(): array
-    {
-        return $this->middleware;
-    }
-
     /**
      * Execute the controller with its middleware.
      * This method should be called instead of the action method directly.

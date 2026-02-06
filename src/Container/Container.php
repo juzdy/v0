@@ -7,18 +7,19 @@ use Juzdy\Container\Exception\NotFoundException;
 use Juzdy\Container\Context\Context;
 use Juzdy\Container\Context\ContextInterface;
 use Juzdy\Container\Exception\CircularDependencyException;
+use Juzdy\Container\Plugin\Di\DiNotFound;
+use Juzdy\Container\Plugin\Di\UseClassAttribute;
+use Juzdy\Container\Plugin\Di\UseParameterAttribute;
+use Juzdy\Container\Plugin\Di\UseType;
 use Juzdy\Container\Plugin\PluginInterface;
-use Juzdy\Container\Plugin\Resolver\AttributeClass;
-use Juzdy\Container\Plugin\Resolver\AttributeParam;
-use Juzdy\Container\Plugin\Resolver\InterfaceResolver;
-use Juzdy\Container\Plugin\Resolver\NotFound;
-use Juzdy\Container\Plugin\Resolver\TypeResolver;
 use Juzdy\Container\Plugin\Factory\FallbackFactory;
 use Juzdy\Container\Plugin\Factory\LazyGhostFactory;
 use Juzdy\Container\Plugin\Factory\StandardFactory;
 use Juzdy\Container\Plugin\LifeCycle\Prototype;
 use Juzdy\Container\Plugin\LifeCycle\Shared;
-use Juzdy\Container\Plugin\Resolver\AttributeClassPropagated;
+use Juzdy\Container\Plugin\Resolver\Concrete;
+use Juzdy\Container\Plugin\Resolver\InterfaceConvention;
+use Juzdy\Container\Plugin\Resolver\WireResolver;
 use Throwable;
 
 /**
@@ -30,9 +31,9 @@ class Container implements JuzdyContainerInterface
 {
     
     /**
-     * @var array<string, mixed> Registered services
+     * @var array<string, mixed> Registered shared services
      */
-    protected array $services = [];
+    protected array $shared = [];
 
     /**
      * @var array<int, string> Stack of currently resolving services
@@ -48,33 +49,48 @@ class Container implements JuzdyContainerInterface
      * @var array<int, array<string, string>> Runtime preferences for interfaces
      */
     protected array $propagatedPreferences = [];
+
+    /**
+     * @var PluginManagerInterface|null The resolve plugin manager.
+     * 
+     * Resolves id to service concrete class.
+     */
+    protected ?PluginManagerInterface $resolveManager = null;
     
     /**
      * @var PluginManagerInterface|null The resolve plugin manager.
+     * 
+     * Resolves dependencies.
      */
-    protected ?PluginManagerInterface $resolveManager = null;
+    protected ?PluginManagerInterface $diManager = null;
 
     /**
      * @var PluginManagerInterface|null The factory plugin manager
+     * 
+     * Processes service creation.
      */
     protected ?PluginManagerInterface $factoryManager = null;
 
     /**
      * @var PluginManagerInterface|null The aware plugin manager.
+     * 
+     * Processes awares. e.g., dependency injection by setter methods.
      */
     protected ?PluginManagerInterface $awareManager = null;
 
     /**
      * @var PluginManagerInterface|null The lifecycle plugin manager.
      * 
+     * Processes lifecycle management of services.
      */
     protected ?PluginManagerInterface $lifecycleManager = null;
 
     /**
-     * @var PluginManagerInterface|null The lifecycle plugin manager.
+     * @var PluginManagerInterface|null The fetch plugin manager.
      * 
+     * Processes shared services on fetch.
      */
-    protected ?PluginManagerInterface $requireManager = null;
+    protected ?PluginManagerInterface $fetchManager = null;
 
     /**
      * Container constructor.
@@ -92,24 +108,29 @@ class Container implements JuzdyContainerInterface
      */
     protected function initPlugins(): static
     {
-        $this->getRequireManager(
+        $this->getFetchManager(
             new Prototype(),          //First registered, last executed
         );
 
         $this->getResolveManager(
-            new NotFound(),                 //First registered, last executed
-            new InterfaceResolver(),
-            new TypeResolver(),
-            new AttributeClass(),
+            new Concrete(),
+            new WireResolver(),              
+            new InterfaceConvention(),
+        );
+
+        $this->getDiManager(
+            new DiNotFound(),
+            new UseType(),
             //new AttributeClassPropagated(),
-            new AttributeParam(),
+            new UseClassAttribute(),
+            new UseParameterAttribute(),
         );
 
         $this->getFactoryManager(
-            new FallbackFactory(),          //First registered, last executed
+            new FallbackFactory(),
             new StandardFactory(),
             new LazyGhostFactory(),
-            //new CustomFactory(),          //Last registered, first executed
+            //new CustomFactory()
         );
 
         $this->getAwareManager(
@@ -144,7 +165,7 @@ class Container implements JuzdyContainerInterface
     {
         return 
             $id === ContainerInterface::class 
-            || $this->hasLocal($id)
+            || $this->hasShared($id)
             || $this->can($id)
         ;
     }
@@ -155,12 +176,11 @@ class Container implements JuzdyContainerInterface
     public function can(string $id): bool
     {
         try {
-            $context = new Context($id, $this);
-
+           
             /**
              * @todo More robust check for instantiability
              */
-            return $context->reflection()->isInstantiable();
+           
 
         } catch (Throwable) {
             
@@ -184,10 +204,14 @@ class Container implements JuzdyContainerInterface
         try {
             $service = match (true) {
                 $id === ContainerInterface::class => $this,
-                $this->hasLocal($id) => $this->require($id),
+                $this->hasShared($id) => $this->fetch($id),
                 default => $this->create($id),
             };
-        } finally {
+        } 
+        catch (Throwable $ex) {
+            throw $ex;
+        }
+        finally {
             array_pop($this->stack);
             unset($this->resolving[$id]);
         }
@@ -200,9 +224,14 @@ class Container implements JuzdyContainerInterface
      */
     public function share(string $id, mixed $instance): static
     {
-        $this->services[$id] = $instance;
+        $this->shared[$id] = $instance;
 
         return $this;
+    }
+
+    public function stack(): array
+    {
+        return $this->stack;
     }
     
     /**
@@ -213,12 +242,17 @@ class Container implements JuzdyContainerInterface
      * 
      * @return mixed The required service instance
      */
-    protected function require(string $id): mixed
+    protected function fetch(string $id): mixed
     {
+        $service = $this->getShared($id);
         $context = new Context($id, $this);
-        $context->instance($this->getLocal($id));
+
+        $context
+            ->id($id)
+            ->class($service::class)
+            ->instance($service);
         
-        $this->getRequireManager()
+        $this->getFetchManager()
                 ->process($context);
 
         return $context->instance();
@@ -231,9 +265,9 @@ class Container implements JuzdyContainerInterface
      * 
      * @return bool True if the local service is registered, false otherwise
      */
-    protected function hasLocal(string $id): bool
+    protected function hasShared(string $id): bool
     {
-        return array_key_exists($id, $this->services);
+        return array_key_exists($id, $this->shared);
     }
 
     
@@ -244,17 +278,17 @@ class Container implements JuzdyContainerInterface
      * 
      * @return mixed The local shared service instance
      */
-    protected function getLocal(string $id): mixed
+    protected function getShared(string $id): mixed
     {
-        return $this->services[$id];
+        return $this->shared[$id];
     }
 
     /**
      * Forget a shared service.
      */
-    protected function forget(string $id): static
+    protected function forgetShared(string $id): static
     {
-        unset($this->services[$id]);
+        unset($this->shared[$id]);
 
         return $this;
     }
@@ -271,12 +305,9 @@ class Container implements JuzdyContainerInterface
     {
         $context = new Context($id, $this);
 
-        if (!$context->reflection()->isInstantiable()) {
-            throw new NotFoundException('Service ' . $id . ' is not instantiable.');
-        }
-
         return $this
             ->resolve($context)
+            ->dependencies($context)
             ->factory($context)
             ->aware($context)
             ->lifecycle($context)
@@ -296,32 +327,50 @@ class Container implements JuzdyContainerInterface
     }
 
     /**
+     * Resolve the service for the context.
+     *
+     * @param ContextInterface $context The context to resolve
+     * 
+     * @return static
+     */
+    protected function resolve(ContextInterface $context): static
+    {
+        /**
+         * Resolve the service class for the context using resolver plugins.
+         */
+        $this->getResolveManager()
+            ->process($context);
+
+        if (!$context->class()) {
+            throw new NotFoundException("Cannot resolve service '{$context->id()}'.");
+        }
+
+        if (!class_exists($context->class())) {
+            throw new NotFoundException("Resolved class '{$context->class()}' for service '{$context->id()}' does not exist.");
+        }
+
+        if (!$context->reflection()?->isInstantiable()) {
+            throw new NotFoundException("Resolved class '{$context->class()}' for service '{$context->id()}' is not instantiable.");
+        }
+
+        return $this;
+    }
+
+    /**
      * Resolve dependencies for the context.
      *
      * @param ContextInterface $context The context to resolve dependencies for
      * 
      * @return static
      */
-    protected function resolve(ContextInterface $context): static
+    protected function dependencies(ContextInterface $context): static
     {
-        foreach ($context->constructor()?->getParameters() ?? [] as $param) {
-            //try {
-                $dep = $this->getResolveManager()
-                    ->process($context->attribute(ContextInterface::ATTRIBUTE_CURRENT_PARAMETER, $param));
-            // } catch (Throwable $ex) {
-            //     $class = $context->reflection()->getName();
-            //     $pname = $param->getName();
-            //     $ptype = $param->getType()?->__toString() ?? 'mixed';
-            //     throw new NotFoundException(
-            //         "Cannot resolve {$class}::__construct(...{$ptype} \${$pname}...); Reason: " . $ex->getMessage(),
-            //         0,
-            //         $ex
-            //     );
-            // }
+        foreach ($context->dependencies() as $param) {
+            $dep = $this->getDiManager()
+                ->process($context->attribute(ContextInterface::ATTRIBUTE_CURRENT_PARAMETER, $param));
 
             $context->depends($dep);
         }
-
 
         return $this;
     }
@@ -335,10 +384,10 @@ class Container implements JuzdyContainerInterface
      */
     protected function factory(ContextInterface $context): static
     {
-        $context->instance(
-            $this->getFactoryManager()
-                ->process($context)
-        );
+        $instance = $this->getFactoryManager()
+                ->process($context);
+
+        $context->instance($instance);
 
         return $this;
     }
@@ -386,11 +435,23 @@ class Container implements JuzdyContainerInterface
             $this->resolveManager = new PluginManager(...$plugins);
         }
 
-        foreach ($plugins as $plugin) {
-            $this->resolveManager->register($plugin);
+        return $this->resolveManager;
+    }
+
+    /**
+     * Get or create the resolve plugin manager.
+     * 
+     * @param PluginInterface ...$plugins Plugins to register
+     *
+     * @return PluginManagerInterface The resolve plugin manager
+     */
+    protected function getDiManager(PluginInterface ...$plugins): PluginManagerInterface
+    {
+        if ($this->diManager === null) {
+            $this->diManager = new PluginManager(...$plugins);
         }
 
-        return $this->resolveManager;
+        return $this->diManager;
     }
 
     /**
@@ -404,10 +465,6 @@ class Container implements JuzdyContainerInterface
     {
         if ($this->factoryManager === null) {
             $this->factoryManager = new PluginManager(...$plugins);
-        }
-
-        foreach ($plugins as $plugin) {
-            $this->factoryManager->register($plugin);
         }
 
         return $this->factoryManager;
@@ -424,10 +481,6 @@ class Container implements JuzdyContainerInterface
     {
         if ($this->awareManager === null) {
             $this->awareManager = new PluginManager(...$plugins);
-        }
-
-        foreach ($plugins as $plugin) {
-            $this->awareManager->register($plugin);
         }
 
         return $this->awareManager;
@@ -447,10 +500,6 @@ class Container implements JuzdyContainerInterface
             $this->lifecycleManager = new PluginManager(...$plugins);
         }
 
-        foreach ($plugins as $plugin) {
-            $this->lifecycleManager->register($plugin);
-        }
-
         return $this->lifecycleManager;
     }
 
@@ -461,18 +510,35 @@ class Container implements JuzdyContainerInterface
      *
      * @return PluginManagerInterface The require plugin manager
      */
-    protected function getRequireManager(PluginInterface ...$plugins): PluginManagerInterface
+    protected function getFetchManager(PluginInterface ...$plugins): PluginManagerInterface
     {
         
-        if ($this->requireManager === null) {
-            $this->requireManager = new PluginManager(...$plugins);
+        if ($this->fetchManager === null) {
+            $this->fetchManager = new PluginManager(...$plugins);
         }
 
-        foreach ($plugins as $plugin) {
-            $this->requireManager->register($plugin);
-        }
-
-        return $this->requireManager;
+        return $this->fetchManager;
     }
+
+    /**
+     * Format an error message with context information.
+     *
+     * @param string $message The error message
+     * @param ContextInterface $context The context of the error
+     * 
+     * @return string The formatted error message
+     */
+    // protected function formatErrorMessage(string $message, ContextInterface $context): string
+    // {
+    //     $class = $context->reflection()->getName();
+    //     $params = [];
+    //     foreach ($context->injects() as $param) {
+    //         $ptype = $param->getType()?->__toString() ?? 'mixed';
+    //         $params[] = "{$ptype} \${$param->getName()}";
+    //     }
+    //     $paramList = implode(', ', $params);
+
+    //     return "Cannot resolve {$class}::__construct({$paramList}); Reason: " . $message. '; Stack: ' . implode(' -> ', $this->stack) . ' -> ' . $class;
+    // }
 
 }

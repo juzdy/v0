@@ -15,7 +15,8 @@ class Prototype implements PluginInterface
     public function __invoke(mixed $context, callable $next): mixed
     {
         if (in_array(PrototypeInterface::class, class_implements($context->class()), true)) {
-            $context->instance(clone $context->instance());
+            $prototype = clone $context->instance();
+            $context->instance($prototype);
         }
 
         return $next($context);

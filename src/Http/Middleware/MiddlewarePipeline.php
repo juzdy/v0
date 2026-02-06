@@ -4,7 +4,6 @@ namespace Juzdy\Http\Middleware;
 use Juzdy\Http\HandlerInterface;
 use Juzdy\Http\RequestInterface;
 use Juzdy\Http\ResponseInterface;
-use Juzdy\Request;
 
 /**
  * Middleware Pipeline
@@ -63,7 +62,7 @@ class MiddlewarePipeline //implements HandlerInterface
     /**
      * Process middleware at the given index.
      *
-     * @param Request $request
+     * @param RequestInterface $request
      * @param int $index
      * @return ResponseInterface
      */

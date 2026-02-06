@@ -16,7 +16,11 @@ class Shared implements PluginInterface
     public function __invoke(mixed $context, callable $next): mixed
     {
         if ($this->isShared($context)) {
-            $context->getContainer()->share($context->id(), $context->instance());
+            $context->container()
+                ->share(
+                    $context->id(),
+                    $context->instance()
+                );
         }
 
         return $next($context);
@@ -36,9 +40,11 @@ class Shared implements PluginInterface
         if (in_array(SharedInterface::class, class_implements($context->class()), true)) {
             return true;
         }
-
+        // Or
         // Check for the Shared attribute
-        $sharedAttributes = $context->reflection()->getAttributes(AttributeShared::class);
+        $sharedAttributes = $context->reflection()
+            ->getAttributes(AttributeShared::class);
+
         if (count($sharedAttributes) > 0) {
             /** @var AttributeShared $sharedAttribute */
             $sharedAttribute = $sharedAttributes[0]->newInstance();

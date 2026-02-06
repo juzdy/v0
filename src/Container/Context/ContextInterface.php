@@ -15,7 +15,7 @@ interface ContextInterface
      *
      * @return JuzdyContainerInterface
      */
-    public function getContainer(): JuzdyContainerInterface;
+    public function container(): JuzdyContainerInterface;
 
     /**
      * Set or get the service instance associated with the context
@@ -37,24 +37,24 @@ interface ContextInterface
     public function attribute(string $name, mixed $value = null): mixed;
 
     /**
-     * Get the identifier of the service associated with the context
+     * Set or get the identifier associated with the context
      * 
-     * @return string
+     * @return string|static
      */
-    public function id(): string;
+    public function id(?string $id = null): string|static;
 
     /**
      * Get the class name associated with the context
      * 
-     * @return string
+     * @return string|null
      */
-    public function class(): string;
+    public function class(): ?string;
 
     /**
      * Get the ReflectionClass instance for the context's class
-     * @return ReflectionClass
+     * @return ReflectionClass|null
      */
-    public function reflection(): ReflectionClass;
+    public function reflection(): ?ReflectionClass;
 
     /**
      * Get the constructor method of the class
@@ -62,13 +62,6 @@ interface ContextInterface
      * @return ReflectionMethod|null
      */
     public function constructor(): ?ReflectionMethod;
-
-    /**
-     * Check if the class has a constructor
-     *
-     * @return bool
-     */
-    public function hasConstructor(): bool;
 
     /**
      * Register dependencies for the context and return the list of all dependencies

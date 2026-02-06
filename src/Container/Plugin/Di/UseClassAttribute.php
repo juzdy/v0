@@ -1,21 +1,19 @@
 <?php
-namespace Juzdy\Container\Plugin\Resolver;
+namespace Juzdy\Container\Plugin\Di;
 
 use Juzdy\Container\Attribute\Preference;
 use Juzdy\Container\Context\ContextInterface;
 use Juzdy\Container\Exception\RuntimeException;
-use Juzdy\Container\Plugin\PluginInterface;
-use Psr\Container\NotFoundExceptionInterface;
 use ReflectionParameter;
 
 /**
  * Class preference attribute resolver plugin
  *
- * Resolves class preferences defined via Preference attribute on the target class.
+ * Resolves class preferences defined via \Juzdy\Container\Attribute\Preference attribute on the target class.
  *
  * @package Juzdy\Container\Plugin\Resolver
  */
-class AttributeClass extends AbstractResolverPlugin implements PluginInterface
+class UseClassAttribute extends AbstractDi
 {
 
     /**
@@ -27,11 +25,12 @@ class AttributeClass extends AbstractResolverPlugin implements PluginInterface
     public function __invoke(mixed $target, callable $next): mixed
     {
         /** @var ContextInterface $context */
-        /** @var \ReflectionParameter $param */
         $context = $target;
+        /** @var \ReflectionParameter $param */
         $param = $context->attribute(ContextInterface::ATTRIBUTE_CURRENT_PARAMETER);
-        $type = $this->paramType($param);
-        $typeName = $type->getName();
+
+
+        $typeName = $this->paramType($param)->getName();
 
        $preferenceAttributes = $context->reflection()->getAttributes(Preference::class);
         if (count($preferenceAttributes) > 0) {
@@ -43,7 +42,7 @@ class AttributeClass extends AbstractResolverPlugin implements PluginInterface
                     throw new RuntimeException("Preference '{$preference}' is not a valid implementation of '{$typeName}'.");
                 }
 
-                return $context->getContainer()->get($preference);
+                return $context->container()->get($preference);
             }
         }
 

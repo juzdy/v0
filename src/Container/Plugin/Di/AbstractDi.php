@@ -1,13 +1,12 @@
 <?php
-
-namespace Juzdy\Container\Plugin\Resolver;
+namespace Juzdy\Container\Plugin\Di;
 
 use Juzdy\Container\Exception\RuntimeException;
 use Juzdy\Container\Plugin\PluginInterface;
 use ReflectionNamedType;
 use ReflectionParameter;
 
-abstract class AbstractResolverPlugin implements PluginInterface
+abstract class AbstractDi implements PluginInterface
 {
 
     /**
@@ -15,9 +14,8 @@ abstract class AbstractResolverPlugin implements PluginInterface
      *
      * @throws RuntimeException if the parameter does not have a named type
      */
-    protected function paramType(
-        ReflectionParameter $param,
-    ): ReflectionNamedType {
+    protected function paramType(ReflectionParameter $param): ReflectionNamedType
+    {
         $type = $param->getType();
 
         if (!$type instanceof ReflectionNamedType) {

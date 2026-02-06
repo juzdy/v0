@@ -4,16 +4,29 @@ namespace Juzdy\Container\Context;
 use Juzdy\Container\JuzdyContainerInterface;
 use ReflectionClass;
 use ReflectionMethod;
+use Traversable;
 
 class Context implements ContextInterface
 {
     /** @var mixed */
     protected mixed $instance = null;
 
+    /** @var string|null */
     protected ?string $className = null;
     
-    /** @var ReflectionClass|null */
+    /**
+     *  @var ReflectionClass|null 
+     * 
+     * Class reflection cache
+     */
     protected ?ReflectionClass $reflectionClass = null;
+
+    /**
+     *  @var ReflectionMethod|null 
+     * 
+     * Constructor reflection cache
+     */
+    protected ?ReflectionMethod $constructor = null;
 
     /** @var array<int, mixed> */
     protected array $dependencies = [];
@@ -30,8 +43,7 @@ class Context implements ContextInterface
         private string $id, 
         private JuzdyContainerInterface $container
         )
-    {        
-        $this->className = $id;
+    {
     }
 
     /**
@@ -39,7 +51,7 @@ class Context implements ContextInterface
      *
      * @return JuzdyContainerInterface
      */
-    public function getContainer(): JuzdyContainerInterface
+    public function container(): JuzdyContainerInterface
     {
         return $this->container;
     }
@@ -73,68 +85,75 @@ class Context implements ContextInterface
     }
 
     /**
-     * Get the identifier of the service associated with the context
-     * 
-     * @return string
+     * {@inheritDoc}
      */
-    public function id(): string
+    public function id(?string $id = null): string|static
     {
+        if ($id !== null) {
+            $this->id = $id;
+            return $this;
+        }
+
         return $this->id;
     }
 
     /**
-     * Get the class name associated with the context
-     * 
-     * @return string
+     * {@inheritDoc}
      */
-    public function class(): string
+    public function class(?string $className = null): ?string
     {
+        if ($className !== null) {
+            $this->className = $className;
+        }
+
         return $this->className;
     }
 
     /**
-     * Get the ReflectionClass instance for the context's class
-     * @return ReflectionClass
+     * {@inheritDoc}
      */
-    public function reflection(): ReflectionClass
+    public function reflection(): ?ReflectionClass
     {
-        return $this->reflectionClass ??= new ReflectionClass($this->class());
+        try {
+            $this->reflectionClass ??= new ReflectionClass($this->class());
+        } catch (\ReflectionException) {
+            return null;
+        }
+
+        return $this->reflectionClass;
     }
 
     /**
-     * Get the constructor method of the class
-     *
-     * @return ReflectionMethod|null
+     * {@inheritDoc}
      */
     public function constructor(): ?ReflectionMethod
     {
-        return $this->reflection()->getConstructor();
+        return $this->reflection()?->getConstructor();
     }
 
     /**
-     * Check if the class has a constructor
-     *
-     * @return bool
+     * {@inheritDoc}
      */
-    public function hasConstructor(): bool
+    public function dependencies(): Traversable
     {
-        return $this->constructor() !== null;
+        if ($this->constructor() === null) {
+            return [];
+        }
+
+        foreach ($this->constructor()?->getParameters() ?? [] as $param) {
+            yield $param;
+        }
     }
 
+    
+
     /**
-     * Register dependencies for the context and return the list of all dependencies
-     *
-     * @param mixed ...$dependencies    Variadic list of dependencies to register
-     * 
-     * @return array                    The list of all registered dependencies
+     * {@inheritDoc}
      */
     public function depends(...$dependencies): array
     {
-        foreach ($dependencies as $dependency) {
-            $this->dependencies[] = $dependency;
-        }
+        array_push($this->dependencies, ...$dependencies);
 
         return $this->dependencies;
     }
-
 }

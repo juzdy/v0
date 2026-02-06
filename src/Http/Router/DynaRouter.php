@@ -1,15 +1,19 @@
 <?php
-namespace Juzdy\Http;
+namespace Juzdy\Http\Router;
 
 use Psr\Container\ContainerInterface;
 use Juzdy\Config;
 use Juzdy\Container\Attribute\Preference;
 use Juzdy\Container\Container;
 use Juzdy\Http\Exception\NotFoundException;
+use Juzdy\Http\HandlerInterface;
 use Juzdy\Http\Middleware\MiddlewareInterface;
+use Juzdy\Http\MiddlewareAwareInterface;
+use Juzdy\Http\RequestInterface;
+use Juzdy\Http\ResponseInterface;
 
 #[Preference(preferences: [ContainerInterface::class => Container::class])]
-class Router implements HandlerInterface, MiddlewareInterface
+class DynaRouter implements RouterInterface
 {
 
     public function __construct(protected ContainerInterface $container)
@@ -35,18 +39,13 @@ class Router implements HandlerInterface, MiddlewareInterface
 
     public function process(RequestInterface $request, HandlerInterface $handler): ResponseInterface
     {
-        return $this->handle($request);
-    }
-    /**
-     * Handle the request.
-     * This method is called by the middleware pipeline.
-     *
-     * @param Request $request
-     * @return ResponseInterface
-     */
-    public function handle(RequestInterface $request): ResponseInterface
-    {
-        return $this->dispatch($request);
+        try {
+            return $this->dispatch($request);
+        } catch (NotFoundException $e) {
+            // Let the next middleware/handler process the request
+        }
+        
+        return $handler->handle($request);
     }
 
     /**
@@ -103,7 +102,6 @@ class Router implements HandlerInterface, MiddlewareInterface
 
         $handlerClass = $handlerClasses[0];
 
-
         if (!class_exists($handlerClass) || !is_subclass_of($handlerClass, HandlerInterface::class)) {
                 throw new \RuntimeException("Handler not found: $handlerClass");
         }
@@ -140,7 +138,17 @@ class Router implements HandlerInterface, MiddlewareInterface
             
             foreach ($middlewareClasses as $middlewareClass) {
                 if (class_exists($middlewareClass)) {
-                    $handler->addMiddleware(new $middlewareClass());
+                    if (!is_subclass_of($middlewareClass, MiddlewareInterface::class)) {
+                        throw new \RuntimeException("Middleware class {$middlewareClass} must implement MiddlewareInterface.");
+                    }
+
+                    if ($handler instanceof MiddlewareAwareInterface) {
+                        $handler->addMiddleware(
+                            $this->getContainer()->get($middlewareClass)
+                        );
+                    } else {
+                         throw new \RuntimeException("Handler class " . get_class($handler) . " must implement MiddlewareAwareInterface to add middleware.");
+                    }
                 }
             }
         }
