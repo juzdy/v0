@@ -1,13 +1,16 @@
 <?php
 namespace Juzdy;
 
+
 use Juzdy\Composer\Composer;
-use Psr\EventDispatcher\EventDispatcherInterface;
-use Juzdy\Container\Attribute\Parameter\Using;
-use Juzdy\Container\Attribute\Preference;
-use Juzdy\Container\Attribute\PropagatePreference;
 use Juzdy\Container\Attribute\Shared;
+use Juzdy\Container\Container;
+use Juzdy\Container\Plugin\Resolver\Concrete;
+use Juzdy\Container\Plugin\Resolver\InterfaceConvention;
+use Juzdy\Container\Plugin\Resolver\WireResolver;
 use Juzdy\EventBus\Event\EventInterface;
+use Juzdy\Http\Http;
+use Juzdy\Plugin\Manager\ResolveManagerInterface;
 use Psr\Container\ContainerInterface;
 
 /**
@@ -16,16 +19,6 @@ use Psr\Container\ContainerInterface;
  * @package Juzdy
  */
 
-/*
- * Preference attribute allows specifying that when AppInterface is requested,
- * the Http\Http class should be provided as its implementation.
- */
-#[Preference(
-    [
-        AppInterface::class => \Juzdy\Http\Http::class,
-        EventDispatcherInterface::class => \Juzdy\EventBus\EventDispatcher::class,
-    ]
-)]
 // #[PropagatePreference(
 //     [
 //         EventDispatcherInterface::class => \Juzdy\EventBus\EventDispatcher::class,
@@ -35,33 +28,37 @@ use Psr\Container\ContainerInterface;
 class Bootstrap implements BootstrapInterface
 {
 
+    private ?ContainerInterface $container = null;
+    private ?AppInterface $app = null;
+
     /**
      * @param AppInterface $app Resolved application instance
      */
     public function __construct(
-        private ContainerInterface $container,
-        private AppInterface $app,
-        private EventDispatcherInterface $eventDispatcher,
-        #[Using(\Juzdy\Http\Event\BeforeRun::class)]
-        private EventInterface $beforeStartEvent
+        private string $base
         )
     {
+    }
+
+    private function base(): string
+    {
+        return $this->base;
     }
 
     /**
      * Get the dependency injection container
      */
-    protected function getContainer(): ContainerInterface
+    private function container(): ContainerInterface
     {
-        return $this->container;
+        return $this->container ??= new Container();
     }
 
     /**
      * Get the application instance
      */
-    protected function getApp(): AppInterface
+    private function app(): AppInterface
     {
-        return $this->app;
+        return $this->app ??= $this->container()->get(Http::class);
     }
 
     /**
@@ -69,18 +66,44 @@ class Bootstrap implements BootstrapInterface
      */
     public function boot(): void
     {
-        $this->composerUp();
+        Config::init($this->base() . '/etc/config/*.php');
 
-        $app = $this->getApp();
+        $this->plugContainer();  
 
-        $this->getEventDispatcher()
-            ->dispatch(
-                $this->getBeforeStartEvent()
-                    ->attach('app', $app)
-            );
+        $app = $this->app();
+
+        $this->warm();
 
         $app->run();
+
     }
+
+    /**
+     * Register container plugins
+     * 
+     * This method registers essential plugins to the container's resolve manager, which is responsible for resolving dependencies and managing object lifecycles.
+     * The registered plugins include:
+     * - Concrete: A plugin that resolves concrete classes without interfaces.
+     * - WireResolver: A plugin that automatically wires dependencies based on constructor signatures.
+     * - InterfaceConvention: A plugin that resolves interfaces based on naming conventions (e.g., AppInterface resolves to App).
+     * 
+     * By registering these plugins, the container can automatically resolve a wide range of dependencies without requiring explicit configuration for each one.
+     * This promotes a convention-over-configuration approach, allowing for faster development and easier maintenance.
+     * Additional plugins can be registered here as needed to support custom resolution logic or specific use cases.
+     * 
+     * @return void
+     */
+    protected function plugContainer()
+    {
+        $this->container()->get(ResolveManagerInterface::class)
+            ->register(new Concrete())
+            ->register(new WireResolver())
+            ->register(new InterfaceConvention())
+            ;
+
+    }
+
+
 
     /**
      * Discover and boot package-specific bootstraps
@@ -99,7 +122,7 @@ class Bootstrap implements BootstrapInterface
      * Errors during discovery (e.g., class not found) are caught and ignored, allowing the process to continue with other namespaces.
      * @return void
      */
-    protected function composerUp(): void
+    protected function warm(): void
     {
         if (!Config::get('bootstrap.discover', false)) {
             return;
@@ -108,7 +131,7 @@ class Bootstrap implements BootstrapInterface
         $psr4 = Composer::namespaces();
 
         foreach ($psr4 as $namespace) {
-            $packageBootstrapClass = '\\' . $namespace . 'Bootstrap';
+            $packageBootstrapClass = '\\' . $namespace . 'Juzdy\Pac';
             try {
 
                 if ($this instanceof $packageBootstrapClass) {
@@ -118,23 +141,13 @@ class Bootstrap implements BootstrapInterface
                 if (!is_a($packageBootstrapClass, BootstrapInterface::class, true)) {
                     continue;
                 }
-                $bootstrap = $this->getContainer()->get($packageBootstrapClass);
-                $bootstrap->boot();
+                $pack = $this->container()->get($packageBootstrapClass);
+                $pack->up($this->app());
 
             } catch (\Psr\Container\NotFoundExceptionInterface) {
                 continue;
             }
         }
-    }
-
-    protected function getEventDispatcher(): EventDispatcherInterface
-    {
-        return $this->eventDispatcher;
-    }
-
-    protected function getBeforeStartEvent(): EventInterface
-    {
-        return $this->beforeStartEvent;
     }
 
 }

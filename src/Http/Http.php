@@ -7,17 +7,14 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Juzdy\Config;
 use Juzdy\AppInterface;
 use Juzdy\Container\Attribute\Parameter\Using;
+use Juzdy\Container\Attribute\Prefer;
+use Juzdy\Container\Attribute\Shared;
 use Juzdy\Container\Contract\InjectableInterface;
-use Juzdy\Container\Contract\LazyGhostInterface;
 use Juzdy\Container\Contract\Lifecycle\PrototypeInterface;
 use Juzdy\Container\Contract\Lifecycle\SharedInterface;
-use Juzdy\Container\Contract\NothingInterface;
 use Juzdy\EventBus\Event\EventInterface;
-use Juzdy\EventBus\EventDispatcher;
 use Juzdy\Http\Event\BeforeRun;
-use Juzdy\Http\Exception\NotFoundException;
 use Juzdy\Http\Handler\NotFoundHandler;
-use Juzdy\Http\HandlerInterface;
 use Juzdy\Http\RequestInterface;
 use Juzdy\Http\ResponseInterface;
 use Juzdy\Http\Middleware\MiddlewarePipeline;
@@ -27,6 +24,12 @@ use Juzdy\Http\Middleware\MiddlewarePipeline;
  *
  * @package Juzdy\Http
  */
+#[Prefer(
+    [
+        EventDispatcherInterface::class => \Juzdy\EventBus\EventDispatcher::class,
+    ]
+)]
+#[Shared]
 class Http implements AppInterface, InjectableInterface, PrototypeInterface, SharedInterface
 {
     /**
@@ -42,7 +45,6 @@ class Http implements AppInterface, InjectableInterface, PrototypeInterface, Sha
         //private NothingInterface $nothing,
         private ContainerInterface $container,
         private RequestInterface $request,
-        #[Using(EventDispatcher::class)]
         private EventDispatcherInterface $eventDispatcher,
         private MiddlewarePipeline $pipeline,
         #[Using(BeforeRun::class)]
