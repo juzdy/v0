@@ -1,14 +1,14 @@
 <?php
 namespace Juzdy;
-
-
+use Juzdy\Config\Config;
+use Juzdy\App\AppInterface;
 use Juzdy\Composer\Composer;
 use Juzdy\Container\Attribute\Shared;
 use Juzdy\Container\Container;
 use Juzdy\Container\Plugin\Resolver\Concrete;
 use Juzdy\Container\Plugin\Resolver\InterfaceConvention;
 use Juzdy\Container\Plugin\Resolver\WireResolver;
-use Juzdy\EventBus\Event\EventInterface;
+use Juzdy\Debug\Debug;
 use Juzdy\Http\Http;
 use Juzdy\Plugin\Manager\ResolveManagerInterface;
 use Psr\Container\ContainerInterface;
@@ -68,11 +68,13 @@ class Bootstrap implements BootstrapInterface
     {
         Config::init($this->base() . '/etc/config/*.php');
 
-        $this->plugContainer();  
-
+        //Debug::dump(Config::all(), true);
+        
+        //$this->plugContainer();  
+        
         $app = $this->app();
 
-        $this->warm();
+        $this->warm(); //@todo: composer.json: extra
 
         $app->run();
 
@@ -93,15 +95,15 @@ class Bootstrap implements BootstrapInterface
      * 
      * @return void
      */
-    protected function plugContainer()
-    {
-        $this->container()->get(ResolveManagerInterface::class)
-            ->register(new Concrete())
-            ->register(new WireResolver())
-            ->register(new InterfaceConvention())
-            ;
+    // protected function plugContainer()
+    // {
+    //     $this->container()->get(ResolveManagerInterface::class)
+    //         ->register(new Concrete())
+    //         ->register(new WireResolver())
+    //         ->register(new InterfaceConvention())
+    //         ;
 
-    }
+    // }
 
 
 
