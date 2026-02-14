@@ -1,17 +1,15 @@
 <?php
 namespace Juzdy;
 
-
-use Juzdy\Composer\Composer;
-use Juzdy\Container\Attribute\Shared;
-use Juzdy\Container\Container;
-use Juzdy\Container\Plugin\Resolver\Concrete;
-use Juzdy\Container\Plugin\Resolver\InterfaceConvention;
-use Juzdy\Container\Plugin\Resolver\WireResolver;
-use Juzdy\EventBus\Event\EventInterface;
-use Juzdy\Http\Http;
-use Juzdy\Plugin\Manager\ResolveManagerInterface;
 use Psr\Container\ContainerInterface;
+use Juzdy\App\AppInterface;
+use Juzdy\Config\Config;
+use Juzdy\Http\Http;
+use Juzdy\Composer\Composer;
+use Juzdy\Config\ConfigInterface;
+use Juzdy\Container\Container;
+use Juzdy\Container\Attribute\Shared;
+use Juzdy\Debug\Debug;
 
 /**
  * Application bootstrapper
@@ -28,6 +26,7 @@ use Psr\Container\ContainerInterface;
 class Bootstrap implements BootstrapInterface
 {
 
+    private ?ConfigInterface $config = null;
     private ?ContainerInterface $container = null;
     private ?AppInterface $app = null;
 
@@ -56,26 +55,37 @@ class Bootstrap implements BootstrapInterface
     /**
      * Get the application instance
      */
-    private function app(): AppInterface
+    public function app(): AppInterface
     {
         return $this->app ??= $this->container()->get(Http::class);
+    }
+
+    // public function up(AppInterface $app): void
+    // {
+    //     // This method can be used by package bootstraps to perform additional setup on the application instance.
+    //     // For example, you could register event listeners, middleware, or other services here.
+    //     // The $app parameter is the main application instance that will be run after all bootstrapping is complete.
+    // }
+
+    private function getConfig(): ConfigInterface
+    {
+        return $this->config ??= $this->container()->get(ConfigInterface::class);
     }
 
     /**
      * Boot the application
      */
-    public function boot(): void
+    public function configure(string $configPath): static
     {
-        Config::init($this->base() . '/etc/config/*.php');
+        $this->getConfig()->load($this->base() . $configPath);
 
-        $this->plugContainer();  
-
+        
         $app = $this->app();
+        //Debug::dump($this->getConfig()->all());
 
-        $this->warm();
+        //$this->warm(); //@todo: composer.json: extra
 
-        $app->run();
-
+        return $this;
     }
 
     /**
@@ -93,15 +103,15 @@ class Bootstrap implements BootstrapInterface
      * 
      * @return void
      */
-    protected function plugContainer()
-    {
-        $this->container()->get(ResolveManagerInterface::class)
-            ->register(new Concrete())
-            ->register(new WireResolver())
-            ->register(new InterfaceConvention())
-            ;
+    // protected function plugContainer()
+    // {
+    //     $this->container()->get(ResolveManagerInterface::class)
+    //         ->register(new Concrete())
+    //         ->register(new WireResolver())
+    //         ->register(new InterfaceConvention())
+    //         ;
 
-    }
+    // }
 
 
 
@@ -124,6 +134,7 @@ class Bootstrap implements BootstrapInterface
      */
     protected function warm(): void
     {
+        return; //@todo: composer.json: extra
         if (!Config::get('bootstrap.discover', false)) {
             return;
         }

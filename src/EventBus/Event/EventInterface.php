@@ -6,22 +6,24 @@ use Psr\EventDispatcher\StoppableEventInterface;
 interface EventInterface extends StoppableEventInterface
 {
     /**
-     * Attach a property on the event and returns the event instance.
+     * Attaches a property to the event.
      *
-     * @param string $name The property name
-     * @param mixed $value The property value
+     * @param string|array $nameOrMap The property name or an associative array of properties
+     * @param mixed $value The property value (if $nameOrMap is a string)
+     * 
      * @return static The event instance
      */
-    public function attach(string $name, mixed $value): static;
+    public function attach(string|array $nameOrMap, mixed $value = null): static;
 
     /**
-     * Sets a property on the event and returns the NEW event instance.
+     * Creates a clone of the event instance with the given property attached.
      *
-     * @param string $name The property name
-     * @param mixed $value The property value
-     * @return static The event instance
+     * @param string|array $nameOrMap The property name or an associative array of properties
+     * @param mixed $value The property value (if $nameOrMap is a string)
+     * 
+     * @return static A new event instance with the property attached
      */
-    public function with(string $name, mixed $value): static;
+    public function with(string|array $nameOrMap, mixed $value = null): static;
 
     /**
      * Gets a property value from the event.

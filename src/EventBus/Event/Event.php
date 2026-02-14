@@ -2,6 +2,7 @@
 namespace Juzdy\EventBus\Event;
 
 use Juzdy\EventBus\Event\ContextInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 
 class Event implements EventInterface
 {
@@ -11,7 +12,10 @@ class Event implements EventInterface
     /**
      * @param array $properties Initial properties for the event
      */
-    public function __construct(protected ContextInterface $context)
+    public function __construct(
+        protected ContextInterface $context, 
+        //protected EventDispatcherInterface $dispatcher
+        )
     {
     }
 
@@ -36,9 +40,15 @@ class Event implements EventInterface
     /**
      * {@inheritDoc}
      */
-    public function attach(string $name, mixed $value): static
+    public function attach(string|array $nameOrMap, mixed $value = null): static
     {
-        $this->getContext()->set($name, $value);
+        if (is_array($nameOrMap)) {
+            foreach ($nameOrMap as $name => $value) {
+                $this->getContext()->set($name, $value);
+            }
+        } else {
+            $this->getContext()->set($nameOrMap, $value);
+        }
 
         return $this;
     }
@@ -46,10 +56,10 @@ class Event implements EventInterface
     /**
      * {@inheritDoc}
      */
-    public function with(string $name, mixed $value): static
+    public function with(string|array $nameOrMap, mixed $value = null): static
     {
         $new = clone $this;
-        $new->attach($name, $value);
+        $new->attach($nameOrMap, $value);
 
         return $new;
     }

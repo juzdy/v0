@@ -2,8 +2,7 @@
 
 namespace Juzdy\Error;
 
-use Juzdy\Config;
-use Juzdy\Helper\Resource;
+use Juzdy\Config\Config;
 
 /**
  * Error Handler - Handles exceptions and errors with custom pages
@@ -52,20 +51,8 @@ class ErrorHandler
 
 
         require Config::get('layout.path') . '/errors/500.phtml';
-        //require Resource::path() . '/views/errors/500.phtml';
         exit;
     }
-    
-    /**
-     * Handle generic errors
-     */
-    // public static function handleError(int $code, string $message = ''): void
-    // {
-    //     http_response_code($code);
-    //     $backgroundVideo = self::getRandomVideo();
-    //     require __DIR__ . '/../Views/errors/generic.phtml';
-    //     exit;
-    // }
 
     
     /**
